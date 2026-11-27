@@ -19,13 +19,48 @@ import struct
 import json
 import time
 import os
+import uuid
 
 # Render and cloud hosts dynamically assign PORT through environment variables
 PORT = int(os.environ.get("PORT", 8080))
 MAGIC_WS_GUID = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"
 
+# Persistent Accounts Store
+ACCOUNTS_FILE = "kiwi_accounts.json"
+
+def load_accounts():
+    if os.path.exists(ACCOUNTS_FILE):
+        try:
+            with open(ACCOUNTS_FILE, "r") as f:
+                return json.load(f)
+        except Exception as e:
+            print(f"⚠️ Error loading accounts file: {e}")
+    return {}
+
+def save_accounts():
+    try:
+        with open(ACCOUNTS_FILE, "w") as f:
+            json.dump(registered_accounts, f, indent=2)
+    except Exception as e:
+        print(f"⚠️ Error saving accounts file: {e}")
+
+def hash_password(password, salt=None):
+    if salt is None:
+        salt = os.urandom(16).hex()
+    hashed = hashlib.sha256((salt + password).encode('utf-8')).hexdigest()
+    return f"{salt}${hashed}"
+
+def verify_password(password, stored_hash):
+    try:
+        salt, h = stored_hash.split("$", 1)
+        return hashlib.sha256((salt + password).encode('utf-8')).hexdigest() == h
+    except Exception:
+        return False
+
+registered_accounts = load_accounts()
+
 # State Store
-# clients: { userId: (reader, writer) }
+# clients: { userId: writer }
 clients = {}
 # user_info: { userId: dict }
 user_info = {}
@@ -146,8 +181,103 @@ async def dispatch_packet(packet, current_user_id, writer):
     action = packet.get("action")
     print(f"📦 [Packet Received]: {action} from user {current_user_id}")
     
+    # 0. Auth: Sign Up with Password
+    if action == "auth_signup":
+        username = packet.get("username", "").strip().lower()
+        password = packet.get("password", "")
+        display_name = packet.get("displayName", "").strip() or username.capitalize()
+        avatar_symbol = packet.get("avatarSymbol", "🥝")
+        avatar_color = packet.get("avatarColorHex", "#10b981")
+        
+        if not username:
+            await send_json(writer, {
+                "action": "auth_response",
+                "success": False,
+                "message": "Username cannot be empty."
+            })
+            return
+            
+        if len(password) < 4:
+            await send_json(writer, {
+                "action": "auth_response",
+                "success": False,
+                "message": "Password must be at least 4 characters."
+            })
+            return
+            
+        if username in registered_accounts:
+            await send_json(writer, {
+                "action": "auth_response",
+                "success": False,
+                "message": f"Username '@{username}' is already taken! Please choose another."
+            })
+            return
+            
+        user_id = str(uuid.uuid4())
+        user_obj = {
+            "id": user_id,
+            "username": username,
+            "displayName": display_name,
+            "avatarSymbol": avatar_symbol,
+            "avatarColorHex": avatar_color
+        }
+        registered_accounts[username] = {
+            "password_hash": hash_password(password),
+            "user": user_obj
+        }
+        save_accounts()
+        
+        clients[user_id] = writer
+        user_info[user_id] = user_obj
+        print(f"🎉 New account created: @{username} ({display_name})")
+        
+        await send_json(writer, {
+            "action": "auth_response",
+            "success": True,
+            "type": "signup",
+            "user": user_obj,
+            "message": f"Welcome, {display_name}!"
+        })
+
+    # 0.1 Auth: Log In with Password Verification
+    elif action == "auth_login":
+        username = packet.get("username", "").strip().lower()
+        password = packet.get("password", "")
+        
+        account = registered_accounts.get(username)
+        if not account:
+            await send_json(writer, {
+                "action": "auth_response",
+                "success": False,
+                "message": f"No account found for '@{username}'. Please sign up first."
+            })
+            return
+            
+        if not verify_password(password, account["password_hash"]):
+            print(f"🚫 Failed login attempt for @{username} (Incorrect password)")
+            await send_json(writer, {
+                "action": "auth_response",
+                "success": False,
+                "message": "❌ Incorrect password. Please try again."
+            })
+            return
+            
+        user_obj = account["user"]
+        user_id = user_obj["id"]
+        clients[user_id] = writer
+        user_info[user_id] = user_obj
+        print(f"✅ Successful login: @{username} ({user_obj.get('displayName')})")
+        
+        await send_json(writer, {
+            "action": "auth_response",
+            "success": True,
+            "type": "login",
+            "user": user_obj,
+            "message": f"Welcome back, {user_obj.get('displayName')}!"
+        })
+
     # 1. Register User / Heartbeat
-    if action == "register_user":
+    elif action == "register_user":
         user_data = packet.get("user", {})
         uid = user_data.get("id")
         if uid:
@@ -263,7 +393,8 @@ async def client_handler(reader, writer):
             packet = await read_ws_message(reader)
             if packet is None:
                 break
-            if packet.get("action") == "register_user":
+            act = packet.get("action")
+            if act == "register_user":
                 current_user_id = packet.get("user", {}).get("id")
             await dispatch_packet(packet, current_user_id, writer)
             
@@ -280,12 +411,11 @@ async def client_handler(reader, writer):
             pass
 
 async def main():
+    print("=" * 60)
+    print(f"🥝 KiwiChat Server Starting on Port {PORT}...")
+    print(f"   Loaded {len(registered_accounts)} registered accounts.")
+    print("=" * 60)
     server = await asyncio.start_server(client_handler, "0.0.0.0", PORT)
-    print("=" * 60)
-    print("🥝  KiwiChat Custom Real-Time WebSocket Server")
-    print(f"📡  Listening on port {PORT}")
-    print(f"📲  Ready for local Wi-Fi and Cloud (Render/Railway) connections!")
-    print("=" * 60)
     async with server:
         await server.serve_forever()
 
@@ -293,4 +423,4 @@ if __name__ == "__main__":
     try:
         asyncio.run(main())
     except KeyboardInterrupt:
-        print("\nServer stopped.")
+        print("\n🥝 Server stopped gracefully.")
