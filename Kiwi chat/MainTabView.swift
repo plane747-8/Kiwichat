@@ -8,7 +8,7 @@ struct MainTabView: View {
         ZStack {
             VStack(spacing: 0) {
                 // Top Profile Switcher & Alert Bar
-                TopProfileSwitcherBar()
+                TopUserStatusBar()
                 
                 // MARK: - Main Content Area
                 GeometryReader { geo in
@@ -81,8 +81,8 @@ struct MainTabView: View {
     }
 }
 
-// MARK: - Top Profile Switcher Bar (For Live Testing)
-struct TopProfileSwitcherBar: View {
+// MARK: - Top User Status Bar
+struct TopUserStatusBar: View {
     @EnvironmentObject var engine: MockLiveEngine
     
     var body: some View {
@@ -90,16 +90,20 @@ struct TopProfileSwitcherBar: View {
             HStack(spacing: 6) {
                 Circle()
                     .fill(Color(hex: engine.currentUser.avatarColorHex))
-                    .frame(width: 22, height: 22)
+                    .frame(width: 24, height: 24)
                     .overlay(
                         Image(systemName: engine.currentUser.avatarSymbol)
-                            .font(.system(size: 12))
+                            .font(.system(size: 13))
                             .foregroundColor(.white)
                     )
                 
-                Text("Logged in as: \(engine.currentUser.displayName)")
-                    .font(.system(size: 12, weight: .bold, design: .rounded))
+                Text(engine.currentUser.displayName)
+                    .font(.system(size: 13, weight: .bold, design: .rounded))
                     .foregroundColor(Color(hex: "#1E293B"))
+                
+                Text("(@\(engine.currentUser.username))")
+                    .font(.system(size: 12, design: .rounded))
+                    .foregroundColor(Color(hex: "#64748B"))
             }
             
             Spacer()
@@ -114,24 +118,16 @@ struct TopProfileSwitcherBar: View {
             
             Spacer()
             
-            Menu {
-                Text("Switch Active Profile (Test Multi-User)")
-                Divider()
-                ForEach(engine.availableDemoUsers) { user in
-                    Button(action: {
-                        engine.switchUser(to: user)
-                    }) {
-                        Label("\(user.displayName) (@\(user.username))", systemImage: engine.currentUser.id == user.id ? "checkmark" : "person")
-                    }
-                }
-            } label: {
+            Button(action: {
+                engine.logoutUser()
+            }) {
                 HStack(spacing: 4) {
-                    Text("Switch User")
-                    Image(systemName: "chevron.down")
+                    Image(systemName: "arrow.backward.circle.fill")
+                    Text("Log Out")
                 }
-                .font(.system(size: 12, weight: .bold, design: .rounded))
-                .foregroundColor(Color(hex: "#5F27CD"))
-                .padding(.horizontal, 10)
+                .font(.system(size: 11, weight: .bold, design: .rounded))
+                .foregroundColor(Color(hex: "#64748B"))
+                .padding(.horizontal, 8)
                 .padding(.vertical, 4)
                 .background(Color(hex: "#F1F5F9"))
                 .cornerRadius(12)

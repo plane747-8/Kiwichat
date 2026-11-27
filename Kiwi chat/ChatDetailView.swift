@@ -125,13 +125,7 @@ struct ChatDetailView: View {
                     .padding(.bottom, 16)
                 }
                 .background(Color(hex: "#F0F4F8"))
-                .onChange(of: messages.count) { _, _ in
-                    if let lastMsg = messages.last {
-                        withAnimation {
-                            proxy.scrollTo(lastMsg.id, anchor: .bottom)
-                        }
-                    }
-                }
+                .modifier(ScrollToBottomOnChange(count: messages.count, lastId: messages.last?.id, proxy: proxy))
             }
             
             // MARK: - Sticker Picker Drawer (If Active)
@@ -530,5 +524,33 @@ struct StickerPickerView: View {
             .padding(.bottom, 10)
         }
         .background(Color(hex: "#F1F5F9"))
+    }
+}
+
+
+// MARK: - Backward-compatible Scroll Modifier (iOS 16 & iOS 17+)
+private struct ScrollToBottomOnChange: ViewModifier {
+    let count: Int
+    let lastId: UUID?
+    let proxy: ScrollViewProxy
+    
+    func body(content: Content) -> some View {
+        if #available(iOS 17.0, *) {
+            content.onChange(of: count) {
+                if let lastId = lastId {
+                    withAnimation {
+                        proxy.scrollTo(lastId, anchor: .bottom)
+                    }
+                }
+            }
+        } else {
+            content.onChange(of: count) { _ in
+                if let lastId = lastId {
+                    withAnimation {
+                        proxy.scrollTo(lastId, anchor: .bottom)
+                    }
+                }
+            }
+        }
     }
 }

@@ -1,0 +1,8 @@
+services:
+  - type: web
+    name: kiwichat-server
+    runtime: python
+    buildCommand: "echo 'Zero dependencies needed'"
+    startCommand: "python3 'Kiwi chat/kiwi_server.py'"
+    plan: free
+    autoDeploy: true

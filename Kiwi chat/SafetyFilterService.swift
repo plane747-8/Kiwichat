@@ -30,6 +30,10 @@ final class SafetyFilterService {
         "badword", "hate", "ugly", "stupid", "idiot", "dumb", "fool", "shut up", "jerk", "freak", "loser"
     ]
     
+    private let maximumExtraWords: Set<String> = [
+        "annoying", "boring", "leave me alone", "go away", "shut it", "gross", "creep", "weirdo"
+    ]
+    
     private let suspiciousPhrases: [String] = [
         "don't tell your parents", "keep this secret", "where do you live",
         "what's your address", "send me a picture", "are you alone", "meet me",
@@ -42,67 +46,79 @@ final class SafetyFilterService {
     
     private init() {}
     
-    func sanitize(_ text: String, customBlockedWords: [String] = []) -> SafetyFilterResult {
+    func sanitize(_ text: String, severity: WordFilterSeverity = .strict, customBlockedWords: [String] = []) -> SafetyFilterResult {
         var cleanText = text
         var flagged = false
         var reasons: [String] = []
         
         let lower = text.lowercased()
         
-        // 1. Check suspicious grooming phrases
+        // 1. Check suspicious grooming phrases (Applies to all tiers)
         for phrase in suspiciousPhrases {
             if lower.contains(phrase) {
                 flagged = true
-                reasons.append("Safety Guard: Detected prohibited phrase")
+                reasons.append("Prohibited secret/grooming phrase")
                 let replacement = String(repeating: "★", count: phrase.count)
                 cleanText = cleanText.replacingOccurrences(of: phrase, with: replacement, options: .caseInsensitive)
             }
         }
         
-        // 2. Check phone numbers (digits sequence >= 7)
-        let phoneRegex = #"\b\d{3}[-.\s]?\d{3}[-.\s]?\d{4}\b"#
-        if let regex = try? NSRegularExpression(pattern: phoneRegex) {
-            let matches = regex.matches(in: cleanText, range: NSRange(cleanText.startIndex..., in: cleanText))
-            if !matches.isEmpty {
-                flagged = true
-                reasons.append("Privacy Guard: Phone number detected & hidden")
-                cleanText = regex.stringByReplacingMatches(in: cleanText, options: [], range: NSRange(cleanText.startIndex..., in: cleanText), withTemplate: "[Phone Number Blocked 🛡️]")
+        // 2. Strict & Maximum: Check phone numbers
+        if severity == .strict || severity == .maximum {
+            let phoneRegex = #"(\b\d{3}[-.\s]?\d{3}[-.\s]?\d{4}\b|\b\d{7,11}\b)"#
+            if let regex = try? NSRegularExpression(pattern: phoneRegex) {
+                let matches = regex.matches(in: cleanText, range: NSRange(cleanText.startIndex..., in: cleanText))
+                if !matches.isEmpty {
+                    flagged = true
+                    reasons.append("Phone number blocked")
+                    cleanText = regex.stringByReplacingMatches(in: cleanText, options: [], range: NSRange(cleanText.startIndex..., in: cleanText), withTemplate: "[Phone Number Blocked 🛡️]")
+                }
             }
         }
         
-        // 3. Check URLs or Emails
-        let urlRegex = #"(https?://\S+|www\.\S+|\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b)"#
-        if let regex = try? NSRegularExpression(pattern: urlRegex) {
-            let matches = regex.matches(in: cleanText, range: NSRange(cleanText.startIndex..., in: cleanText))
-            if !matches.isEmpty {
-                flagged = true
-                reasons.append("Privacy Guard: External links/emails blocked")
-                cleanText = regex.stringByReplacingMatches(in: cleanText, options: [], range: NSRange(cleanText.startIndex..., in: cleanText), withTemplate: "[Link Blocked 🛡️]")
+        // 3. Strict & Maximum: Check URLs or Emails
+        if severity == .strict || severity == .maximum {
+            let urlRegex = #"(https?://\S+|www\.\S+|\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b)"#
+            if let regex = try? NSRegularExpression(pattern: urlRegex) {
+                let matches = regex.matches(in: cleanText, range: NSRange(cleanText.startIndex..., in: cleanText))
+                if !matches.isEmpty {
+                    flagged = true
+                    reasons.append("External links/emails blocked")
+                    cleanText = regex.stringByReplacingMatches(in: cleanText, options: [], range: NSRange(cleanText.startIndex..., in: cleanText), withTemplate: "[Link Blocked 🛡️]")
+                }
             }
         }
         
-        // 4. Check Street Address keywords (e.g. 123 Main St, Avenue, Rd)
-        let streetAddressRegex = #"\b\d{1,5}\s+[A-Za-z0-9\s]{2,20}\s+(Street|St|Avenue|Ave|Road|Rd|Drive|Dr|Boulevard|Blvd|Lane|Ln|Court|Ct)\b"#
-        if let regex = try? NSRegularExpression(pattern: streetAddressRegex, options: .caseInsensitive) {
-            let matches = regex.matches(in: cleanText, range: NSRange(cleanText.startIndex..., in: cleanText))
-            if !matches.isEmpty {
-                flagged = true
-                reasons.append("Privacy Guard: Street address detected & hidden")
-                cleanText = regex.stringByReplacingMatches(in: cleanText, options: [], range: NSRange(cleanText.startIndex..., in: cleanText), withTemplate: "[Address Blocked 🛡️]")
+        // 4. Strict & Maximum: Check Street Address keywords
+        if severity == .strict || severity == .maximum {
+            let streetAddressRegex = #"\b\d{1,5}\s+[A-Za-z0-9\s]{2,20}\s+(Street|St|Avenue|Ave|Road|Rd|Drive|Dr|Boulevard|Blvd|Lane|Ln|Court|Ct)\b"#
+            if let regex = try? NSRegularExpression(pattern: streetAddressRegex, options: .caseInsensitive) {
+                let matches = regex.matches(in: cleanText, range: NSRange(cleanText.startIndex..., in: cleanText))
+                if !matches.isEmpty {
+                    flagged = true
+                    reasons.append("Street address blocked")
+                    cleanText = regex.stringByReplacingMatches(in: cleanText, options: [], range: NSRange(cleanText.startIndex..., in: cleanText), withTemplate: "[Address Blocked 🛡️]")
+                }
             }
         }
         
-        // 5. Social Media Handle detection (@username or platform mentions)
-        for platform in socialPlatforms {
-            if lower.contains(platform) {
-                flagged = true
-                reasons.append("Privacy Guard: Social media app handle blocked")
-                cleanText = cleanText.replacingOccurrences(of: platform, with: "[Social Media Blocked 🛡️]", options: .caseInsensitive)
+        // 5. Strict & Maximum: Social Media Handle detection
+        if severity == .strict || severity == .maximum {
+            for platform in socialPlatforms {
+                if lower.contains(platform) {
+                    flagged = true
+                    reasons.append("Social media platform mention blocked")
+                    cleanText = cleanText.replacingOccurrences(of: platform, with: "[Social Media Blocked 🛡️]", options: .caseInsensitive)
+                }
             }
         }
         
         // 6. Inappropriate words & custom words
-        let wordsToMask = inappropriateWords.union(customBlockedWords.map { $0.lowercased() })
+        var wordsToMask = inappropriateWords.union(customBlockedWords.map { $0.lowercased() })
+        if severity == .maximum {
+            wordsToMask = wordsToMask.union(maximumExtraWords)
+        }
+        
         let components = cleanText.components(separatedBy: .whitespacesAndNewlines)
         var sanitizedWords: [String] = []
         
@@ -110,6 +126,9 @@ final class SafetyFilterService {
             let stripped = word.trimmingCharacters(in: .punctuationCharacters).lowercased()
             if wordsToMask.contains(stripped) {
                 flagged = true
+                if !reasons.contains("Inappropriate language blocked") {
+                    reasons.append("Inappropriate language blocked")
+                }
                 let masked = String(repeating: "*", count: max(3, word.count))
                 sanitizedWords.append(masked)
             } else {

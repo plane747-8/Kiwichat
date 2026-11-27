@@ -6,12 +6,18 @@ import Combine
 final class MockLiveEngine: ObservableObject {
     // MARK: - Published Properties
     @Published var currentUser: KidUser
-    @Published var availableDemoUsers: [KidUser] = []
+    @Published var savedUsers: [KidUser] = []
+    @Published var userPasswords: [String: String] = [:] // username -> password
+    
+    // Clean Empty Lists - ZERO BOTS!
     @Published var friends: [FriendContact] = []
+    @Published var pendingFriendInvites: [FriendContact] = []
     @Published var messagesByFriendId: [UUID: [ChatMessage]] = [:]
     @Published var activeInviteCodes: [InviteCode] = []
     @Published var flaggedIncidents: [FlaggedIncident] = []
-    @Published var isAuthenticated: Bool = true // Allows toggle between Auth Screen and Main App
+    
+    // Start on Sign Up / Login Screen
+    @Published var isAuthenticated: Bool = false
     
     // Active Navigation / Modals
     @Published var selectedFriendId: UUID?
@@ -25,276 +31,229 @@ final class MockLiveEngine: ObservableObject {
     
     // MARK: - Initializer
     init() {
-        // Create Demo Users
-        let leoSettings = ParentSafetySettings(parentPin: "1234")
-        let leo = KidUser(
-            id: UUID(uuidString: "11111111-1111-1111-1111-111111111111")!,
-            username: "leo_star",
-            displayName: "Leo",
-            avatarSymbol: "face.smiling.fill",
-            avatarColorHex: "#FF6B81",
-            parentSettings: leoSettings
-        )
-        
-        let emma = KidUser(
-            id: UUID(uuidString: "22222222-2222-2222-2222-222222222222")!,
-            username: "emma_play",
-            displayName: "Emma",
+        // Default placeholder user before logging in
+        let placeholder = KidUser(
+            username: "guest",
+            displayName: "Guest",
             avatarSymbol: "person.crop.circle.fill",
-            avatarColorHex: "#FF758C"
+            avatarColorHex: "#38BDF8"
         )
+        self.currentUser = placeholder
+        self.friends = []
+        self.pendingFriendInvites = []
+        self.messagesByFriendId = [:]
+        self.flaggedIncidents = []
+        self.activeInviteCodes = []
+        self.isAuthenticated = false
         
-        let lucas = KidUser(
-            id: UUID(uuidString: "33333333-3333-3333-3333-333333333333")!,
-            username: "lucas_gamer",
-            displayName: "Lucas",
-            avatarSymbol: "sparkles",
-            avatarColorHex: "#2ED573"
-        )
+        loadSavedAccounts()
         
-        let ava = KidUser(
-            id: UUID(uuidString: "44444444-4444-4444-4444-444444444444")!,
-            username: "ava_sun",
-            displayName: "Ava",
-            avatarSymbol: "star.fill",
-            avatarColorHex: "#FF9F43"
-        )
-        
-        let noah = KidUser(
-            id: UUID(uuidString: "55555555-5555-5555-5555-555555555555")!,
-            username: "noah_hero",
-            displayName: "Noah",
-            avatarSymbol: "bolt.fill",
-            avatarColorHex: "#54a0ff"
-        )
-        
-        let olivia = KidUser(
-            id: UUID(uuidString: "66666666-6666-6666-6666-666666666666")!,
-            username: "olivia_art",
-            displayName: "Olivia",
-            avatarSymbol: "heart.fill",
-            avatarColorHex: "#9c88ff"
-        )
-        
-        self.currentUser = leo
-        self.availableDemoUsers = [leo, emma, lucas, ava, noah, olivia]
-        
-        setupInitialFriendsAndMessages(leo: leo, emma: emma, lucas: lucas, ava: ava, noah: noah, olivia: olivia)
+        // Configure Custom Live WebSocket client
+        KiwiWebSocketClient.shared.configure(with: self)
     }
     
-    // MARK: - Setup Initial Data matching UI screenshot
-    private func setupInitialFriendsAndMessages(
-        leo: KidUser,
-        emma: KidUser,
-        lucas: KidUser,
-        ava: KidUser,
-        noah: KidUser,
-        olivia: KidUser
-    ) {
-        let fEmma = FriendContact(
-            friendUserId: emma.id,
-            friendUsername: emma.username,
-            displayName: "Emma",
-            avatarSymbol: "person.fill",
-            avatarColorHex: "#FF758C",
-            isOnline: true,
-            lastMessagePreview: "Let's play later! 🎮",
-            lastMessageTimeStr: "10:24 AM",
-            unreadCount: 0
-        )
-        
-        let fLucas = FriendContact(
-            friendUserId: lucas.id,
-            friendUsername: lucas.username,
-            displayName: "Lucas",
-            avatarSymbol: "person.fill",
-            avatarColorHex: "#2ED573",
-            isOnline: true,
-            lastMessagePreview: "Sounds good! 👍",
-            lastMessageTimeStr: "9:12 AM",
-            unreadCount: 0
-        )
-        
-        let fAva = FriendContact(
-            friendUserId: ava.id,
-            friendUsername: ava.username,
-            displayName: "Ava",
-            avatarSymbol: "person.fill",
-            avatarColorHex: "#FF9F43",
-            isOnline: false,
-            lastMessagePreview: "Check this out! 🐱",
-            lastMessageTimeStr: "Yesterday",
-            unreadCount: 0
-        )
-        
-        let fNoah = FriendContact(
-            friendUserId: noah.id,
-            friendUsername: noah.username,
-            displayName: "Noah",
-            avatarSymbol: "person.fill",
-            avatarColorHex: "#54a0ff",
-            isOnline: false,
-            lastMessagePreview: "See you at recess!",
-            lastMessageTimeStr: "Yesterday",
-            unreadCount: 0
-        )
-        
-        let fOlivia = FriendContact(
-            friendUserId: olivia.id,
-            friendUsername: olivia.username,
-            displayName: "Olivia",
-            avatarSymbol: "person.fill",
-            avatarColorHex: "#9c88ff",
-            isOnline: false,
-            lastMessagePreview: "That's awesome! 🌈",
-            lastMessageTimeStr: "Monday",
-            unreadCount: 0
-        )
-        
-        self.friends = [fEmma, fLucas, fAva, fNoah, fOlivia]
-        self.selectedFriendId = fEmma.id
-        
-        // Populate Emma Chat Thread (Matches UI screenshot!)
-        let emmaMessages: [ChatMessage] = [
-            ChatMessage(
-                senderId: leo.id,
-                receiverId: emma.id,
-                type: .text,
-                textContent: "Hi Emma! 👋 What do you want to do today?",
-                timestamp: Date().addingTimeInterval(-3600)
-            ),
-            ChatMessage(
-                senderId: emma.id,
-                receiverId: leo.id,
-                type: .text,
-                textContent: "Hey! 😊 Maybe we can play a game or watch a funny video?",
-                timestamp: Date().addingTimeInterval(-2700)
-            ),
-            ChatMessage(
-                senderId: leo.id,
-                receiverId: emma.id,
-                type: .text,
-                textContent: "Both sound great! 🎮 Let's play after lunch!",
-                timestamp: Date().addingTimeInterval(-1800)
-            ),
-            ChatMessage(
-                senderId: emma.id,
-                receiverId: leo.id,
-                type: .text,
-                textContent: "Yay! 🎉 See you then!",
-                timestamp: Date().addingTimeInterval(-900)
-            ),
-            ChatMessage(
-                senderId: emma.id,
-                receiverId: leo.id,
-                type: .sticker,
-                textContent: "Sticker",
-                stickerName: "cat_waving",
-                timestamp: Date().addingTimeInterval(-300)
-            )
-        ]
-        
-        let lucasMessages: [ChatMessage] = [
-            ChatMessage(
-                senderId: lucas.id,
-                receiverId: leo.id,
-                type: .text,
-                textContent: "Sounds good! 👍",
-                timestamp: Date().addingTimeInterval(-7200)
-            )
-        ]
-        
-        let avaMessages: [ChatMessage] = [
-            ChatMessage(
-                senderId: ava.id,
-                receiverId: leo.id,
-                type: .text,
-                textContent: "Check this out! 🐱",
-                timestamp: Date().addingTimeInterval(-86400)
-            )
-        ]
-        
-        let noahMessages: [ChatMessage] = [
-            ChatMessage(
-                senderId: noah.id,
-                receiverId: leo.id,
-                type: .text,
-                textContent: "See you at recess!",
-                timestamp: Date().addingTimeInterval(-86400)
-            )
-        ]
-        
-        let oliviaMessages: [ChatMessage] = [
-            ChatMessage(
-                senderId: olivia.id,
-                receiverId: leo.id,
-                type: .text,
-                textContent: "That's awesome! 🌈",
-                timestamp: Date().addingTimeInterval(-172800)
-            )
-        ]
-        
-        messagesByFriendId[fEmma.id] = emmaMessages
-        messagesByFriendId[fLucas.id] = lucasMessages
-        messagesByFriendId[fAva.id] = avaMessages
-        messagesByFriendId[fNoah.id] = noahMessages
-        messagesByFriendId[fOlivia.id] = oliviaMessages
+    // MARK: - Local Persistence for Accounts
+    private func loadSavedAccounts() {
+        if let data = UserDefaults.standard.data(forKey: "kiwi_saved_users"),
+           let decoded = try? JSONDecoder().decode([KidUser].self, from: data) {
+            self.savedUsers = decoded
+        }
+        if let passDict = UserDefaults.standard.dictionary(forKey: "kiwi_user_passwords") as? [String: String] {
+            self.userPasswords = passDict
+        }
     }
     
-    // MARK: - Auth Actions
-    func loginKidUser(username: String, password: String) {
-        if let match = availableDemoUsers.first(where: { $0.username.lowercased() == username.lowercased() }) {
-            self.currentUser = match
+    private func saveAccounts() {
+        if let encoded = try? JSONEncoder().encode(savedUsers) {
+            UserDefaults.standard.set(encoded, forKey: "kiwi_saved_users")
+        }
+        UserDefaults.standard.set(userPasswords, forKey: "kiwi_user_passwords")
+    }
+    
+    // MARK: - Real Authentication (Sign Up & Login)
+    func loginKidUser(username: String, password: String) -> (success: Bool, message: String) {
+        let cleanUser = username.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        guard !cleanUser.isEmpty else {
+            return (false, "Please enter your username.")
+        }
+        guard !password.isEmpty else {
+            return (false, "Please enter your password.")
+        }
+        
+        // Check if user exists
+        if let matchedUser = savedUsers.first(where: { $0.username.lowercased() == cleanUser }) {
+            let correctPassword = userPasswords[cleanUser] ?? ""
+            if !correctPassword.isEmpty && correctPassword != password {
+                return (false, "Incorrect password. Please try again.")
+            }
+            self.currentUser = matchedUser
         } else {
+            // First time login with this username -> create account
             let newKid = KidUser(
-                username: username.lowercased(),
-                displayName: username.capitalized,
-                avatarSymbol: "star.fill",
+                username: cleanUser,
+                displayName: cleanUser.capitalized,
+                avatarSymbol: "face.smiling.fill",
                 avatarColorHex: "#38BDF8"
             )
             self.currentUser = newKid
-            self.availableDemoUsers.append(newKid)
+            self.savedUsers.append(newKid)
+            self.userPasswords[cleanUser] = password
+            saveAccounts()
         }
+        
         self.isAuthenticated = true
-        self.systemNotificationMessage = "Logged in as \(currentUser.displayName) 👋"
+        self.systemNotificationMessage = "Welcome, \(currentUser.displayName)! 👋"
+        
+        // Connect & register on live WebSocket server
+        KiwiWebSocketClient.shared.connect()
+        KiwiWebSocketClient.shared.registerUser(currentUser)
+        
+        return (true, "Logged in successfully")
     }
     
     func registerNewKidUser(
         username: String,
+        password: String,
         displayName: String,
         avatarSymbol: String,
         avatarColorHex: String,
         parentPin: String,
         parentEmail: String
-    ) {
-        let parentConfig = ParentSafetySettings(parentPin: parentPin, parentEmail: parentEmail)
+    ) -> (success: Bool, message: String) {
+        let cleanUser = username.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        let cleanName = displayName.trimmingCharacters(in: .whitespacesAndNewlines)
+        
+        guard !cleanUser.isEmpty else { return (false, "Please choose a username.") }
+        guard !password.isEmpty, password.count >= 4 else { return (false, "Password must be at least 4 characters.") }
+        guard !cleanName.isEmpty else { return (false, "Please enter a display nickname.") }
+        guard parentPin.count == 4 else { return (false, "Parent PIN must be 4 digits.") }
+        
+        // Prevent duplicate usernames
+        if savedUsers.contains(where: { $0.username.lowercased() == cleanUser }) {
+            return (false, "Username '@\(cleanUser)' is already taken. Please pick another.")
+        }
+        
+        let parentConfig = ParentSafetySettings(
+            parentPin: parentPin,
+            parentEmail: parentEmail.isEmpty ? "parent@family.com" : parentEmail,
+            enableWordFilter: true,
+            filterSeverity: .strict,
+            requirePinForFriends: false,
+            enableVoiceNotes: true,
+            enableVideoCalls: true
+        )
+        
         let newKid = KidUser(
-            username: username.lowercased(),
-            displayName: displayName,
+            username: cleanUser,
+            displayName: cleanName,
             avatarSymbol: avatarSymbol,
             avatarColorHex: avatarColorHex,
             parentSettings: parentConfig
         )
+        
         self.currentUser = newKid
-        self.availableDemoUsers.append(newKid)
+        self.savedUsers.append(newKid)
+        self.userPasswords[cleanUser] = password
+        saveAccounts()
+        
         self.isAuthenticated = true
-        self.systemNotificationMessage = "Created safe account for \(displayName) 🎉"
+        self.systemNotificationMessage = "Welcome to KiwiChat, \(cleanName)! 🎉"
+        
+        // Connect & register on live WebSocket server
+        KiwiWebSocketClient.shared.connect()
+        KiwiWebSocketClient.shared.registerUser(newKid)
+        
+        return (true, "Account created")
     }
     
     func logoutUser() {
         self.isAuthenticated = false
+        self.friends = []
+        self.messagesByFriendId = [:]
+        self.pendingFriendInvites = []
+        KiwiWebSocketClient.shared.disconnect()
         self.systemNotificationMessage = "Logged out"
     }
     
-    // MARK: - Actions
+    // MARK: - Contact Management Actions
+    func approveFriendInvite(inviteId: UUID) {
+        guard let index = pendingFriendInvites.firstIndex(where: { $0.id == inviteId }) else { return }
+        var approvedFriend = pendingFriendInvites.remove(at: index)
+        approvedFriend.isApprovedByParent = true
+        approvedFriend.lastMessagePreview = "Parent approved! Happy chatting 🎉"
+        approvedFriend.lastMessageTimeStr = "Just now"
+        friends.insert(approvedFriend, at: 0)
+        
+        systemNotificationMessage = "Approved friendship with \(approvedFriend.displayName) 🛡️"
+    }
+    
+    func rejectFriendInvite(inviteId: UUID) {
+        guard let index = pendingFriendInvites.firstIndex(where: { $0.id == inviteId }) else { return }
+        let friend = pendingFriendInvites.remove(at: index)
+        systemNotificationMessage = "Declined invite from \(friend.displayName)"
+    }
+    
+    func togglePauseChat(for friendId: UUID) {
+        guard let idx = friends.firstIndex(where: { $0.id == friendId }) else { return }
+        friends[idx].isChatPaused.toggle()
+        let status = friends[idx].isChatPaused ? "Paused" : "Resumed"
+        systemNotificationMessage = "\(status) chat for \(friends[idx].displayName)"
+    }
+    
+    func toggleBlockContact(for friendId: UUID) {
+        guard let idx = friends.firstIndex(where: { $0.id == friendId }) else { return }
+        friends[idx].isBlocked.toggle()
+        let status = friends[idx].isBlocked ? "Blocked" : "Unblocked"
+        systemNotificationMessage = "\(status) \(friends[idx].displayName)"
+    }
+    
+    func removeContact(for friendId: UUID) {
+        if let idx = friends.firstIndex(where: { $0.id == friendId }) {
+            let removedName = friends[idx].displayName
+            friends.remove(at: idx)
+            messagesByFriendId.removeValue(forKey: friendId)
+            if selectedFriendId == friendId {
+                selectedFriendId = friends.first?.id
+            }
+            systemNotificationMessage = "Removed \(removedName) from contacts"
+        }
+    }
+    
+    // MARK: - Flagged Incident Log Management
+    func dismissFlaggedIncident(id: UUID) {
+        flaggedIncidents.removeAll(where: { $0.id == id })
+    }
+    
+    func clearAllFlaggedIncidents() {
+        flaggedIncidents.removeAll()
+        systemNotificationMessage = "Cleared all safety incident logs"
+    }
+    
+    // MARK: - Sending Messages (Real Network Only - NO BOTS!)
     func sendMessage(to friendId: UUID, text: String, type: MessageType = .text, audioDuration: Double? = nil, stickerName: String? = nil) {
         guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || type != .text else { return }
+        
+        // Check if chat is paused or friend is blocked
+        if let friend = friends.first(where: { $0.id == friendId }) {
+            if friend.isBlocked {
+                systemNotificationMessage = "⚠️ Cannot send message: Contact is blocked by parent."
+                return
+            }
+            if friend.isChatPaused {
+                systemNotificationMessage = "⚠️ Cannot send message: Chat is currently paused by parent."
+                return
+            }
+        }
         
         // 1. Run Safety Word Filter
         var cleanText = text
         var flagged = false
         if type == .text && currentUser.parentSettings.enableWordFilter {
-            let filterResult = SafetyFilterService.shared.sanitize(text, customBlockedWords: currentUser.parentSettings.customBlockedWords)
+            let filterResult = SafetyFilterService.shared.sanitize(
+                text,
+                severity: currentUser.parentSettings.filterSeverity,
+                customBlockedWords: currentUser.parentSettings.customBlockedWords
+            )
             cleanText = filterResult.filteredText
             flagged = filterResult.wasFlagged
             if flagged, let reason = filterResult.flagReason {
@@ -306,9 +265,13 @@ final class MockLiveEngine: ObservableObject {
             }
         }
         
+        // Target receiver ID is the remote friend's userId
+        let targetFriend = friends.first(where: { $0.id == friendId })
+        let remoteReceiverId = targetFriend?.friendUserId ?? friendId
+        
         let newMsg = ChatMessage(
             senderId: currentUser.id,
-            receiverId: friendId,
+            receiverId: remoteReceiverId,
             type: type,
             textContent: cleanText,
             audioDuration: audioDuration,
@@ -329,37 +292,8 @@ final class MockLiveEngine: ObservableObject {
             friends[idx].lastMessageTimeStr = "Just now"
         }
         
-        // Simulate Friend Auto-Reply after 2.5 seconds
-        DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) { [weak self] in
-            self?.simulateAutoReply(from: friendId)
-        }
-    }
-    
-    private func simulateAutoReply(from friendId: UUID) {
-        guard let friend = friends.first(where: { $0.id == friendId }) else { return }
-        let replies = [
-            "Super cool! 😎",
-            "Can't wait to play! 🚀",
-            "Awesome! 🌟",
-            "Haha that's so funny! 😂",
-            "See you later! 👋"
-        ]
-        let randomReply = replies.randomElement() ?? "Yay!"
-        
-        let replyMsg = ChatMessage(
-            senderId: friend.friendUserId,
-            receiverId: currentUser.id,
-            type: .text,
-            textContent: randomReply,
-            timestamp: Date(),
-            isRead: true
-        )
-        
-        messagesByFriendId[friendId]?.append(replyMsg)
-        if let idx = friends.firstIndex(where: { $0.id == friendId }) {
-            friends[idx].lastMessagePreview = randomReply
-            friends[idx].lastMessageTimeStr = "Just now"
-        }
+        // Send across Live WebSocket to the other phone
+        KiwiWebSocketClient.shared.sendChatMessage(newMsg)
     }
     
     // MARK: - 6-Digit One-Time Code Generator & Redeemer
@@ -373,6 +307,10 @@ final class MockLiveEngine: ObservableObject {
             creatorAvatarSymbol: currentUser.avatarSymbol
         )
         activeInviteCodes.append(codeObj)
+        
+        // Broadcast to Live Server
+        KiwiWebSocketClient.shared.broadcastInviteCode(digits, creator: currentUser)
+        
         return codeObj
     }
     
@@ -382,41 +320,10 @@ final class MockLiveEngine: ObservableObject {
             return (false, "Please enter a valid 6-digit code.")
         }
         
-        // Check if code matches a demo user code or dynamically generated code
-        let friendNames = ["Chloe", "Zack", "Maya", "Ethan", "Lily"]
-        let randomName = friendNames.randomElement() ?? "Friend"
+        // Transmit redemption packet to Live Server to match with the real phone!
+        KiwiWebSocketClient.shared.redeemInviteCode(cleaned, redeemer: currentUser)
         
-        let newFriendUser = KidUser(
-            username: "\(randomName.lowercased())_buddy",
-            displayName: randomName,
-            avatarSymbol: "person.crop.circle.fill",
-            avatarColorHex: "#70A1FF"
-        )
-        
-        let newContact = FriendContact(
-            friendUserId: newFriendUser.id,
-            friendUsername: newFriendUser.username,
-            displayName: newFriendUser.displayName,
-            avatarSymbol: "person.fill",
-            avatarColorHex: "#70A1FF",
-            isOnline: true,
-            lastMessagePreview: "Connected via 6-digit code! 🎉",
-            lastMessageTimeStr: "Just now"
-        )
-        
-        friends.insert(newContact, at: 0)
-        messagesByFriendId[newContact.id] = [
-            ChatMessage(
-                senderId: newFriendUser.id,
-                receiverId: currentUser.id,
-                type: .text,
-                textContent: "Hey \(currentUser.displayName)! We connected using the 6-digit invite code! 🎉",
-                timestamp: Date()
-            )
-        ]
-        
-        selectedFriendId = newContact.id
-        return (true, "Success! Connected with \(randomName) 👋")
+        return (true, "Searching for your friend with code \(cleaned)...")
     }
     
     // MARK: - Calls (Video / Audio)
@@ -425,11 +332,19 @@ final class MockLiveEngine: ObservableObject {
             systemNotificationMessage = "🔒 Video calling is disabled by Parent Controls."
             return
         }
+        if friend.isBlocked || friend.isChatPaused {
+            systemNotificationMessage = "⚠️ Video call unavailable for this contact."
+            return
+        }
         activeVideoCallFriend = friend
         isVideoCallActive = true
+        KiwiWebSocketClient.shared.sendCallSignal(action: "call_start", friendId: friend.friendUserId)
     }
     
     func endVideoCall() {
+        if let friend = activeVideoCallFriend {
+            KiwiWebSocketClient.shared.sendCallSignal(action: "call_end", friendId: friend.friendUserId)
+        }
         isVideoCallActive = false
         activeVideoCallFriend = nil
     }
@@ -439,19 +354,20 @@ final class MockLiveEngine: ObservableObject {
             systemNotificationMessage = "🔒 Voice calls are disabled by Parent Controls."
             return
         }
+        if friend.isBlocked || friend.isChatPaused {
+            systemNotificationMessage = "⚠️ Voice call unavailable for this contact."
+            return
+        }
         activeAudioCallFriend = friend
         isAudioCallActive = true
+        KiwiWebSocketClient.shared.sendCallSignal(action: "call_start", friendId: friend.friendUserId)
     }
     
     func endAudioCall() {
+        if let friend = activeAudioCallFriend {
+            KiwiWebSocketClient.shared.sendCallSignal(action: "call_end", friendId: friend.friendUserId)
+        }
         isAudioCallActive = false
         activeAudioCallFriend = nil
-    }
-    
-    // MARK: - Switch Demo User Profile
-    func switchUser(to user: KidUser) {
-        self.currentUser = user
-        self.isParentModeUnlocked = false
-        systemNotificationMessage = "Switched active profile to \(user.displayName)"
     }
 }

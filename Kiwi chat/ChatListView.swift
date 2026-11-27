@@ -56,24 +56,70 @@ struct ChatListView: View {
             
             // MARK: - Friend Chat List
             ScrollView {
-                LazyVStack(spacing: 0) {
-                    ForEach(engine.friends) { friend in
-                        Button(action: {
-                            engine.selectedFriendId = friend.id
-                        }) {
-                            FriendRowCard(
-                                friend: friend,
-                                isSelected: engine.selectedFriendId == friend.id
-                            )
-                        }
-                        .buttonStyle(PlainButtonStyle())
+                if engine.friends.isEmpty {
+                    VStack(spacing: 16) {
+                        Spacer(minLength: 60)
                         
-                        Divider()
-                            .padding(.leading, 76)
-                            .opacity(0.3)
+                        ZStack {
+                            Circle()
+                                .fill(Color(hex: "#48DBFB").opacity(0.15))
+                                .frame(width: 90, height: 90)
+                            
+                            Image(systemName: "person.2.badge.key.fill")
+                                .font(.system(size: 40))
+                                .foregroundColor(Color(hex: "#48DBFB"))
+                        }
+                        
+                        Text("No Friends Added Yet!")
+                            .font(.system(size: 22, weight: .bold, design: .rounded))
+                            .foregroundColor(Color(hex: "#1E293B"))
+                        
+                        Text("Exchange a safe 6-digit code with your friend to start chatting live.")
+                            .font(.system(size: 14, weight: .medium, design: .rounded))
+                            .foregroundColor(Color(hex: "#64748B"))
+                            .multilineTextAlignment(.center)
+                            .padding(.horizontal, 36)
+                        
+                        Button(action: {
+                            selectedTab = 1 // Switch to Add Friend tab
+                        }) {
+                            HStack(spacing: 8) {
+                                Image(systemName: "key.fill")
+                                Text("Add Friend with Code 🔑")
+                            }
+                            .font(.system(size: 15, weight: .bold, design: .rounded))
+                            .foregroundColor(.white)
+                            .padding(.horizontal, 24)
+                            .padding(.vertical, 14)
+                            .background(Color(hex: "#5F27CD"))
+                            .cornerRadius(20)
+                            .shadow(color: Color(hex: "#5F27CD").opacity(0.3), radius: 8, x: 0, y: 4)
+                        }
+                        .padding(.top, 8)
+                        
+                        Spacer(minLength: 60)
                     }
+                    .frame(maxWidth: .infinity)
+                } else {
+                    LazyVStack(spacing: 0) {
+                        ForEach(engine.friends) { friend in
+                            Button(action: {
+                                engine.selectedFriendId = friend.id
+                            }) {
+                                FriendRowCard(
+                                    friend: friend,
+                                    isSelected: engine.selectedFriendId == friend.id
+                                )
+                            }
+                            .buttonStyle(PlainButtonStyle())
+                            
+                            Divider()
+                                .padding(.leading, 76)
+                                .opacity(0.3)
+                        }
+                    }
+                    .padding(.top, 4)
                 }
-                .padding(.top, 4)
             }
             .background(Color(hex: "#F8FAFC"))
         }

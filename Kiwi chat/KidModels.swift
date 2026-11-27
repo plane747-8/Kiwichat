@@ -10,6 +10,31 @@ enum MessageType: String, Codable {
     case callNotice
 }
 
+// MARK: - Word Filter Severity
+enum WordFilterSeverity: String, CaseIterable, Codable, Identifiable {
+    case standard = "Standard"
+    case strict = "Strict"
+    case maximum = "Maximum"
+    
+    var id: String { rawValue }
+    
+    var icon: String {
+        switch self {
+        case .standard: return "shield"
+        case .strict: return "shield.lefthalf.filled"
+        case .maximum: return "shield.fill"
+        }
+    }
+    
+    var summary: String {
+        switch self {
+        case .standard: return "Blocks bad language & personal grooming phrases"
+        case .strict: return "Also blocks links, phone numbers & social media apps"
+        case .maximum: return "Highest shield: blocks all numbers, addresses & unkind words"
+        }
+    }
+}
+
 // MARK: - Chat Message Model
 struct ChatMessage: Identifiable, Codable, Equatable {
     let id: UUID
@@ -71,6 +96,7 @@ struct FriendContact: Identifiable, Codable, Equatable {
     var unreadCount: Int
     var isApprovedByParent: Bool
     var isBlocked: Bool
+    var isChatPaused: Bool
     
     init(
         id: UUID = UUID(),
@@ -84,7 +110,8 @@ struct FriendContact: Identifiable, Codable, Equatable {
         lastMessageTimeStr: String = "Just now",
         unreadCount: Int = 0,
         isApprovedByParent: Bool = true,
-        isBlocked: Bool = false
+        isBlocked: Bool = false,
+        isChatPaused: Bool = false
     ) {
         self.id = id
         self.friendUserId = friendUserId
@@ -98,6 +125,7 @@ struct FriendContact: Identifiable, Codable, Equatable {
         self.unreadCount = unreadCount
         self.isApprovedByParent = isApprovedByParent
         self.isBlocked = isBlocked
+        self.isChatPaused = isChatPaused
     }
 }
 
@@ -145,6 +173,7 @@ struct ParentSafetySettings: Codable, Equatable {
     var parentPin: String
     var parentEmail: String
     var enableWordFilter: Bool
+    var filterSeverity: WordFilterSeverity
     var requirePinForFriends: Bool
     var enableVoiceNotes: Bool
     var enableVideoCalls: Bool
@@ -157,6 +186,7 @@ struct ParentSafetySettings: Codable, Equatable {
         parentPin: String = "1234",
         parentEmail: String = "parent@family.com",
         enableWordFilter: Bool = true,
+        filterSeverity: WordFilterSeverity = .strict,
         requirePinForFriends: Bool = false,
         enableVoiceNotes: Bool = true,
         enableVideoCalls: Bool = true,
@@ -168,6 +198,7 @@ struct ParentSafetySettings: Codable, Equatable {
         self.parentPin = parentPin
         self.parentEmail = parentEmail
         self.enableWordFilter = enableWordFilter
+        self.filterSeverity = filterSeverity
         self.requirePinForFriends = requirePinForFriends
         self.enableVoiceNotes = enableVoiceNotes
         self.enableVideoCalls = enableVideoCalls
