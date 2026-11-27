@@ -2,6 +2,9 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+  <meta http-equiv="Pragma" content="no-cache" />
+  <meta http-equiv="Expires" content="0" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>KiwiChat 🥝 — Live Kids Chat</title>
   <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🥝</text></svg>">
@@ -147,7 +150,7 @@
     }
 
     .auth-mascot {
-      font-size: 54px;
+      font-size: 52px;
       text-align: center;
       margin-bottom: 6px;
       animation: bounce 2s infinite ease-in-out;
@@ -170,7 +173,7 @@
       font-size: 13px;
       color: var(--text-muted);
       text-align: center;
-      margin-bottom: 18px;
+      margin-bottom: 16px;
     }
 
     /* Auth Mode Tabs (Log In vs Sign Up) */
@@ -179,12 +182,12 @@
       background: #f1f5f9;
       border-radius: 14px;
       padding: 4px;
-      margin-bottom: 18px;
+      margin-bottom: 16px;
     }
 
     .auth-mode-btn {
       flex: 1;
-      padding: 9px;
+      padding: 10px;
       border: none;
       background: transparent;
       border-radius: 11px;
@@ -207,10 +210,10 @@
       background: #fef2f2;
       border: 1.5px solid #f87171;
       color: #b91c1c;
-      padding: 10px 14px;
+      padding: 12px 14px;
       border-radius: 14px;
       font-size: 13px;
-      font-weight: 600;
+      font-weight: 700;
       margin-bottom: 14px;
       text-align: center;
     }
@@ -231,11 +234,13 @@
     }
 
     .input-label {
-      font-size: 12px;
+      font-size: 13px;
       font-weight: 700;
-      color: #475569;
-      margin-bottom: 5px;
-      display: block;
+      color: #334155;
+      margin-bottom: 6px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
     }
 
     .input-wrapper {
@@ -246,16 +251,24 @@
 
     .text-input {
       width: 100%;
-      padding: 12px 14px;
+      padding: 13px 14px;
       border: 2px solid var(--border);
       border-radius: 14px;
       font-size: 15px;
       outline: none;
-      transition: border-color 0.2s;
+      background: #f8fafc;
+      transition: all 0.2s;
     }
 
     .text-input:focus {
       border-color: var(--primary);
+      background: white;
+      box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.15);
+    }
+
+    .text-input.error {
+      border-color: var(--danger);
+      background: #fef2f2;
     }
 
     .toggle-pass-btn {
@@ -266,6 +279,7 @@
       cursor: pointer;
       font-size: 16px;
       color: var(--text-muted);
+      padding: 4px;
     }
 
     /* Avatar Grid */
@@ -273,7 +287,7 @@
       display: flex;
       justify-content: center;
       gap: 8px;
-      margin-bottom: 18px;
+      margin-bottom: 16px;
     }
 
     .avatar-choice {
@@ -308,6 +322,7 @@
       box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
       transition: transform 0.15s, opacity 0.15s;
       width: 100%;
+      margin-top: 6px;
     }
 
     .btn-primary:active {
@@ -614,8 +629,8 @@
 
         <!-- Toggle: Log In vs Sign Up -->
         <div class="auth-mode-selector">
-          <button id="btnModeLogin" class="auth-mode-btn active" onclick="setAuthMode('login')">Log In</button>
-          <button id="btnModeSignup" class="auth-mode-btn" onclick="setAuthMode('signup')">Sign Up</button>
+          <button id="btnModeLogin" class="auth-mode-btn active" onclick="setAuthMode('login')">Log In 🚀</button>
+          <button id="btnModeSignup" class="auth-mode-btn" onclick="setAuthMode('signup')">Sign Up ✨</button>
         </div>
 
         <!-- Error Alert Banner -->
@@ -623,29 +638,30 @@
 
         <!-- Username Field -->
         <div class="input-group">
-          <label class="input-label" for="usernameInput">Username</label>
+          <label class="input-label" for="usernameInput">👤 Username</label>
           <input type="text" id="usernameInput" class="text-input" placeholder="e.g. superhero123" maxlength="20" autocomplete="off">
         </div>
 
-        <!-- Password Field -->
+        <!-- PASSWORD FIELD (PROMINENT & CLEAR) -->
         <div class="input-group">
-          <label class="input-label" for="passwordInput">Password</label>
+          <label class="input-label" for="passwordInput">🔑 Password</label>
           <div class="input-wrapper">
-            <input type="password" id="passwordInput" class="text-input" placeholder="Enter your password..." onkeydown="if(event.key==='Enter') submitAuth()">
-            <button type="button" class="toggle-pass-btn" onclick="togglePasswordVisibility()">👁️</button>
+            <input type="password" id="passwordInput" class="text-input" placeholder="Enter password (min 4 characters)..." autocomplete="current-password" onkeydown="if(event.key==='Enter') submitAuth()">
+            <button type="button" class="toggle-pass-btn" onclick="togglePasswordVisibility()" title="Show/Hide Password">👁️</button>
           </div>
+          <span style="font-size: 11px; color: var(--text-muted); margin-top: 4px; display: block;">Passwords must match to log in. Wrong passwords will be rejected!</span>
         </div>
 
-        <!-- Sign Up Only: Display Name -->
+        <!-- Sign Up Only: Display Nickname & Avatar -->
         <div id="signupFields" style="display: none;">
           <div class="input-group">
-            <label class="input-label" for="displayNameInput">Display Nickname</label>
+            <label class="input-label" for="displayNameInput">🏷️ Display Nickname</label>
             <input type="text" id="displayNameInput" class="text-input" placeholder="e.g. Super Hero" maxlength="20">
           </div>
 
           <!-- Avatar Picker -->
           <div class="input-group">
-            <label class="input-label">Pick your avatar</label>
+            <label class="input-label">🎨 Pick Your Avatar</label>
             <div class="avatar-grid">
               <div class="avatar-choice selected" data-emoji="🥝" onclick="selectAvatar(this)">🥝</div>
               <div class="avatar-choice" data-emoji="🐱" onclick="selectAvatar(this)">🐱</div>
@@ -743,10 +759,13 @@
     let activeFriend = null;
     let currentTab = "chats";
 
-    // Initialize
+    // Initialize: ALWAYS start on Log In / Sign Up screen so Password place is visible
     window.addEventListener("DOMContentLoaded", () => {
-      // Restore saved user if present
-      const savedUserJson = localStorage.getItem("kiwi_web_user");
+      // Clear any legacy password-less sessions
+      localStorage.removeItem("kiwi_web_user");
+      
+      // Check for password-authenticated session
+      const savedUserJson = localStorage.getItem("kiwi_authenticated_user_v2");
       if (savedUserJson) {
         try {
           currentUser = JSON.parse(savedUserJson);
@@ -755,10 +774,22 @@
           showMainApp();
         } catch (e) {
           console.error(e);
+          showAuthView();
         }
+      } else {
+        showAuthView();
       }
       initWebSocket();
     });
+
+    function showAuthView() {
+      document.getElementById("authView").style.display = "flex";
+      document.getElementById("chatsTab").style.display = "none";
+      document.getElementById("pairTab").style.display = "none";
+      document.getElementById("chatScreen").style.display = "none";
+      document.getElementById("navBar").style.display = "none";
+      document.getElementById("logoutBtn").style.display = "none";
+    }
 
     // WebSocket Connection
     function initWebSocket() {
@@ -808,7 +839,7 @@
       if (socket && socket.readyState === WebSocket.OPEN) {
         socket.send(JSON.stringify(obj));
       } else {
-        showAuthError("Server is connecting. Please try again in 5 seconds.");
+        showAuthError("⚠️ Server is connecting. Please try again in 3 seconds.");
       }
     }
 
@@ -860,12 +891,14 @@
       alertBox.classList.remove("shake");
       void alertBox.offsetWidth; // retrigger css animation
       alertBox.classList.add("shake");
+      document.getElementById("passwordInput").classList.add("error");
     }
 
     function hideAuthError() {
       const alertBox = document.getElementById("authAlert");
       alertBox.style.display = "none";
       alertBox.textContent = "";
+      document.getElementById("passwordInput").classList.remove("error");
     }
 
     // Submit Auth (Log In or Sign Up)
@@ -875,18 +908,18 @@
       const password = document.getElementById("passwordInput").value;
 
       if (!username) {
-        showAuthError("Please enter your username.");
+        showAuthError("⚠️ Please enter your username.");
         return;
       }
 
       if (!password) {
-        showAuthError("Please enter your password.");
+        showAuthError("⚠️ Please enter your password.");
         return;
       }
 
       if (authMode === "signup") {
         if (password.length < 4) {
-          showAuthError("Password must be at least 4 characters.");
+          showAuthError("⚠️ Password must be at least 4 characters.");
           return;
         }
         const displayName = document.getElementById("displayNameInput").value.trim() || username.charAt(0).toUpperCase() + username.slice(1);
@@ -912,8 +945,8 @@
     // Handle Server Auth Response
     function handleAuthResponse(data) {
       if (!data.success) {
-        // WRONG PASSWORD OR USER NOT FOUND: REJECT!
-        showAuthError(data.message || "Login failed.");
+        // REJECT WRONG PASSWORD OR INVALID USER:
+        showAuthError(data.message || "❌ Incorrect credentials.");
         document.getElementById("passwordInput").value = "";
         document.getElementById("passwordInput").focus();
         return;
@@ -921,7 +954,7 @@
 
       // Successful Auth!
       currentUser = data.user;
-      localStorage.setItem("kiwi_web_user", JSON.stringify(currentUser));
+      localStorage.setItem("kiwi_authenticated_user_v2", JSON.stringify(currentUser));
       friends = JSON.parse(localStorage.getItem(`kiwi_friends_${currentUser.id}`) || "[]");
       messages = JSON.parse(localStorage.getItem(`kiwi_messages_${currentUser.id}`) || "{}");
       showMainApp();
@@ -929,16 +962,11 @@
 
     function handleLogout() {
       if (confirm("Are you sure you want to log out?")) {
-        localStorage.removeItem("kiwi_web_user");
+        localStorage.removeItem("kiwi_authenticated_user_v2");
         currentUser = null;
         friends = [];
         messages = {};
-        document.getElementById("authView").style.display = "flex";
-        document.getElementById("chatsTab").style.display = "none";
-        document.getElementById("pairTab").style.display = "none";
-        document.getElementById("chatScreen").style.display = "none";
-        document.getElementById("navBar").style.display = "none";
-        document.getElementById("logoutBtn").style.display = "none";
+        showAuthView();
         document.getElementById("passwordInput").value = "";
         hideAuthError();
       }
@@ -1038,7 +1066,7 @@
           <div class="empty-state">
             <div class="empty-icon">🤝</div>
             <h3>No friends yet!</h3>
-            <p>Tap "Add Friend" below to create or enter a 6-digit code.</p>
+            <p>Tap "Add Friend" below to connect with a 6-digit code.</p>
           </div>
         `;
         return;
