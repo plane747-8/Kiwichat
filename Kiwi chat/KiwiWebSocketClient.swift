@@ -7,8 +7,11 @@ import Combine
 final class KiwiWebSocketClient: ObservableObject {
     static let shared = KiwiWebSocketClient()
     
+    // Live Cloud Server on Render (Worldwide: Ohio to Japan & Everywhere!)
+    static let defaultCloudServer = "kiwichat.onrender.com"
+    
     @Published var isConnected: Bool = false
-    @Published var serverAddress: String = "192.168.254.90:8080" // Default Mac Wi-Fi IP or Cloud URL
+    @Published var serverAddress: String = "kiwichat.onrender.com"
     @Published var connectionStatusText: String = "Disconnected"
     
     private var webSocketTask: URLSessionWebSocketTask?
@@ -16,9 +19,14 @@ final class KiwiWebSocketClient: ObservableObject {
     private weak var liveEngine: MockLiveEngine?
     
     private init() {
-        // Load saved server IP if present
-        if let saved = UserDefaults.standard.string(forKey: "kiwi_server_ip"), !saved.isEmpty {
+        // Load saved server URL if present and not the old local IP
+        if let saved = UserDefaults.standard.string(forKey: "kiwi_server_ip"),
+           !saved.isEmpty,
+           !saved.contains("192.168.") {
             self.serverAddress = saved
+        } else {
+            self.serverAddress = Self.defaultCloudServer
+            UserDefaults.standard.set(Self.defaultCloudServer, forKey: "kiwi_server_ip")
         }
     }
     
@@ -57,13 +65,13 @@ final class KiwiWebSocketClient: ObservableObject {
             return
         }
         
-        connectionStatusText = "Connecting..."
+        connectionStatusText = "Connecting to Cloud Server..."
         let session = URLSession(configuration: .default)
         let task = session.webSocketTask(with: url)
         self.webSocketTask = task
         task.resume()
         
-        // Save preferred IP
+        // Save preferred URL
         UserDefaults.standard.set(serverAddress, forKey: "kiwi_server_ip")
         
         // Start listening
@@ -213,7 +221,7 @@ final class KiwiWebSocketClient: ObservableObject {
         switch action {
         case "registered_success":
             self.isConnected = true
-            self.connectionStatusText = "Live Connected 🟢"
+            self.connectionStatusText = "Cloud Connected 🟢"
             
         case "incoming_message":
             if let msgDict = dict["message"] as? [String: Any] {
@@ -243,6 +251,7 @@ final class KiwiWebSocketClient: ObservableObject {
                 
                 if !engine.friends.contains(where: { $0.friendUserId == friendUUID }) {
                     engine.friends.insert(newContact, at: 0)
+                    engine.saveChatData()
                 }
                 engine.systemNotificationMessage = "🎉 \(displayName) paired via your 6-digit code!"
             }
@@ -322,6 +331,7 @@ final class KiwiWebSocketClient: ObservableObject {
                 engine.friends[idx].lastMessagePreview = type == .audio ? "🎙️ Voice Note" : (type == .sticker ? "🐱 Sticker" : textContent)
                 engine.friends[idx].lastMessageTimeStr = "Just now"
             }
+            engine.saveChatData()
         }
     }
 }

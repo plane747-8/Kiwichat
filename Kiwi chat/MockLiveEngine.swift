@@ -52,7 +52,7 @@ final class MockLiveEngine: ObservableObject {
         KiwiWebSocketClient.shared.configure(with: self)
     }
     
-    // MARK: - Local Persistence for Accounts
+    // MARK: - Local Persistence for Accounts & Chat Data
     private func loadSavedAccounts() {
         if let data = UserDefaults.standard.data(forKey: "kiwi_saved_users"),
            let decoded = try? JSONDecoder().decode([KidUser].self, from: data) {
@@ -61,6 +61,17 @@ final class MockLiveEngine: ObservableObject {
         if let passDict = UserDefaults.standard.dictionary(forKey: "kiwi_user_passwords") as? [String: String] {
             self.userPasswords = passDict
         }
+        
+        // Auto-restore last logged in kid
+        if let lastUserId = UserDefaults.standard.string(forKey: "kiwi_last_logged_in_user_id"),
+           let uuid = UUID(uuidString: lastUserId),
+           let user = savedUsers.first(where: { $0.id == uuid }) {
+            self.currentUser = user
+            self.isAuthenticated = true
+            loadChatData()
+            KiwiWebSocketClient.shared.connect()
+            KiwiWebSocketClient.shared.registerUser(user)
+        }
     }
     
     private func saveAccounts() {
@@ -68,6 +79,42 @@ final class MockLiveEngine: ObservableObject {
             UserDefaults.standard.set(encoded, forKey: "kiwi_saved_users")
         }
         UserDefaults.standard.set(userPasswords, forKey: "kiwi_user_passwords")
+    }
+    
+    func saveChatData() {
+        guard isAuthenticated else { return }
+        let keyFriends = "kiwi_friends_\(currentUser.id.uuidString)"
+        let keyMessages = "kiwi_messages_\(currentUser.id.uuidString)"
+        if let data = try? JSONEncoder().encode(friends) {
+            UserDefaults.standard.set(data, forKey: keyFriends)
+        }
+        let stringKeyDict = Dictionary(uniqueKeysWithValues: messagesByFriendId.map { ($0.key.uuidString, $0.value) })
+        if let data = try? JSONEncoder().encode(stringKeyDict) {
+            UserDefaults.standard.set(data, forKey: keyMessages)
+        }
+    }
+    
+    func loadChatData() {
+        let keyFriends = "kiwi_friends_\(currentUser.id.uuidString)"
+        let keyMessages = "kiwi_messages_\(currentUser.id.uuidString)"
+        if let data = UserDefaults.standard.data(forKey: keyFriends),
+           let decoded = try? JSONDecoder().decode([FriendContact].self, from: data) {
+            self.friends = decoded
+        } else {
+            self.friends = []
+        }
+        if let data = UserDefaults.standard.data(forKey: keyMessages),
+           let decoded = try? JSONDecoder().decode([String: [ChatMessage]].self, from: data) {
+            var restored: [UUID: [ChatMessage]] = [:]
+            for (k, v) in decoded {
+                if let uuid = UUID(uuidString: k) {
+                    restored[uuid] = v
+                }
+            }
+            self.messagesByFriendId = restored
+        } else {
+            self.messagesByFriendId = [:]
+        }
     }
     
     // MARK: - Real Authentication (Sign Up & Login)
@@ -102,6 +149,8 @@ final class MockLiveEngine: ObservableObject {
         }
         
         self.isAuthenticated = true
+        UserDefaults.standard.set(currentUser.id.uuidString, forKey: "kiwi_last_logged_in_user_id")
+        loadChatData()
         self.systemNotificationMessage = "Welcome, \(currentUser.displayName)! 👋"
         
         // Connect & register on live WebSocket server
@@ -157,6 +206,8 @@ final class MockLiveEngine: ObservableObject {
         saveAccounts()
         
         self.isAuthenticated = true
+        UserDefaults.standard.set(newKid.id.uuidString, forKey: "kiwi_last_logged_in_user_id")
+        loadChatData()
         self.systemNotificationMessage = "Welcome to KiwiChat, \(cleanName)! 🎉"
         
         // Connect & register on live WebSocket server
@@ -168,6 +219,7 @@ final class MockLiveEngine: ObservableObject {
     
     func logoutUser() {
         self.isAuthenticated = false
+        UserDefaults.standard.removeObject(forKey: "kiwi_last_logged_in_user_id")
         self.friends = []
         self.messagesByFriendId = [:]
         self.pendingFriendInvites = []
@@ -183,6 +235,7 @@ final class MockLiveEngine: ObservableObject {
         approvedFriend.lastMessagePreview = "Parent approved! Happy chatting 🎉"
         approvedFriend.lastMessageTimeStr = "Just now"
         friends.insert(approvedFriend, at: 0)
+        saveChatData()
         
         systemNotificationMessage = "Approved friendship with \(approvedFriend.displayName) 🛡️"
     }
@@ -196,6 +249,7 @@ final class MockLiveEngine: ObservableObject {
     func togglePauseChat(for friendId: UUID) {
         guard let idx = friends.firstIndex(where: { $0.id == friendId }) else { return }
         friends[idx].isChatPaused.toggle()
+        saveChatData()
         let status = friends[idx].isChatPaused ? "Paused" : "Resumed"
         systemNotificationMessage = "\(status) chat for \(friends[idx].displayName)"
     }
@@ -203,6 +257,7 @@ final class MockLiveEngine: ObservableObject {
     func toggleBlockContact(for friendId: UUID) {
         guard let idx = friends.firstIndex(where: { $0.id == friendId }) else { return }
         friends[idx].isBlocked.toggle()
+        saveChatData()
         let status = friends[idx].isBlocked ? "Blocked" : "Unblocked"
         systemNotificationMessage = "\(status) \(friends[idx].displayName)"
     }
@@ -212,6 +267,7 @@ final class MockLiveEngine: ObservableObject {
             let removedName = friends[idx].displayName
             friends.remove(at: idx)
             messagesByFriendId.removeValue(forKey: friendId)
+            saveChatData()
             if selectedFriendId == friendId {
                 selectedFriendId = friends.first?.id
             }
@@ -291,6 +347,9 @@ final class MockLiveEngine: ObservableObject {
             friends[idx].lastMessagePreview = type == .audio ? "🎙️ Voice Note" : (type == .sticker ? "🐱 Sticker" : cleanText)
             friends[idx].lastMessageTimeStr = "Just now"
         }
+        
+        // Save chat data locally
+        saveChatData()
         
         // Send across Live WebSocket to the other phone
         KiwiWebSocketClient.shared.sendChatMessage(newMsg)
